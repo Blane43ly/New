@@ -420,41 +420,134 @@
     </div>
 
     <script>
-        // Backend API URL
-        const API_URL = 'https://ep-dry-fog-ad9nu5r6.apirest.c-2.us-east-1.aws.neon.tech/neondb/rest/v1';
-
+        // Contestant data from the uploaded file
+        const contestants = {
+            sciences: {
+                mr: [
+                    { id: 'sci-mr-1', name: 'Jack Laho', faculty: 'Sciences', course: 'BSCS-3', photo: 'https://randomuser.me/api/portraits/men/32.jpg', votes: 0 }
+                ],
+                ms: [
+                    { id: 'sci-ms-1', name: 'Calessah Mukekit', faculty: 'Sciences', course: 'BFTE-3', photo: 'https://randomuser.me/api/portraits/women/44.jpg', votes: 0 }
+                ]
+            },
+            engineering: {
+                mr: [
+                    { id: 'eng-mr-1', name: 'Moses Nathan', faculty: 'Engineering', course: 'BEME-4', photo: 'https://randomuser.me/api/portraits/men/22.jpg', votes: 0 }
+                ],
+                ms: [
+                    { id: 'eng-ms-1', name: 'Joy Iwais', faculty: 'Engineering', course: 'BEEL-4', photo: 'https://randomuser.me/api/portraits/women/22.jpg', votes: 0 }
+                ]
+            },
+            environment: {
+                mr: [
+                    { id: 'env-mr-1', name: 'Darius Yeou', faculty: 'Built Environment', course: 'BACM-3', photo: 'https://randomuser.me/api/portraits/men/12.jpg', votes: 0 }
+                ],
+                ms: [
+                    { id: 'env-ms-1', name: 'Linda Oa', faculty: 'Built Environment', course: 'BPST-1', photo: 'https://randomuser.me/api/portraits/women/12.jpg', votes: 0 }
+                ]
+            },
+            humanities: {
+                mr: [
+                    { id: 'hum-mr-1', name: 'Craig Posa', faculty: 'Humanities', course: 'BACD-2', photo: 'https://randomuser.me/api/portraits/men/15.jpg', votes: 0 }
+                ],
+                ms: [
+                    { id: 'hum-ms-1', name: 'Abigail Kaisi Uia', faculty: 'Humanities', course: 'BBAE-3', photo: 'https://randomuser.me/api/portraits/women/15.jpg', votes: 0 }
+                ]
+            },
+            resources: {
+                mr: [
+                    { id: 'res-mr-1', name: 'Joel Toi', faculty: 'Natural Resources', course: 'BSCF-3', photo: 'https://randomuser.me/api/portraits/men/25.jpg', votes: 0 }
+                ],
+                ms: [
+                    { id: 'res-ms-1', name: 'Georgina Roy', faculty: 'Natural Resources', course: 'BSAG-3', photo: 'https://randomuser.me/api/portraits/women/25.jpg', votes: 0 }
+                ]
+            }
+        };
+        
         // Selected contestants
         let selectedMr = null;
         let selectedMs = null;
         let currentFaculty = null;
-        let contestants = {}; // Will be loaded from backend
-
-        // Generate or get unique voterId
-        function getVoterId() {
+        
+        // Initialize votes from localStorage if available
+        function initializeVotes() {
+            const savedVotes = localStorage.getItem('unitechVotes');
+            if (savedVotes) {
+                const voteData = JSON.parse(savedVotes);
+                
+                // Update votes for each contestant
+                for (const faculty in voteData) {
+                    for (const gender in voteData[faculty]) {
+                        voteData[faculty][gender].forEach(contestant => {
+                            const foundContestant = contestants[faculty][gender].find(c => c.id === contestant.id);
+                            if (foundContestant) {
+                                foundContestant.votes = contestant.votes;
+                            }
+                        });
+                    }
+                }
+            }
+            
+            // Initialize voter tracking
+            if (!localStorage.getItem('voterTracking')) {
+                localStorage.setItem('voterTracking', JSON.stringify({}));
+            }
+        }
+        
+        // Save votes to localStorage
+        function saveVotes() {
+            localStorage.setItem('unitechVotes', JSON.stringify(contestants));
+        }
+        
+        // Track voter by IP (simulated with a random ID for demo purposes)
+        function trackVoter() {
             let voterId = localStorage.getItem('voterId');
             if (!voterId) {
                 voterId = 'voter-' + Math.random().toString(36).substr(2, 9);
                 localStorage.setItem('voterId', voterId);
             }
+            
+            const tracking = JSON.parse(localStorage.getItem('voterTracking'));
+            tracking[voterId] = true;
+            localStorage.setItem('voterTracking', JSON.stringify(tracking));
+            
             return voterId;
         }
-
+        
+        // Check if voter has already voted
+        function hasVoted() {
+            const voterId = localStorage.getItem('voterId');
+            if (!voterId) return false;
+            
+            const tracking = JSON.parse(localStorage.getItem('voterTracking'));
+            return tracking[voterId] || false;
+        }
+        
         // Show the selected tab
         function showTab(tabName) {
+            // Hide all content sections
             document.getElementById('voting').classList.add('hidden');
             document.getElementById('results').classList.add('hidden');
+            
+            // Remove active class from all buttons
             const buttons = document.querySelectorAll('.tab-button');
             buttons.forEach(button => button.classList.remove('active'));
+            
+            // Show the selected tab and set button as active
             document.getElementById(tabName).classList.remove('hidden');
             event.currentTarget.classList.add('active');
+            
+            // If results tab, refresh results
             if (tabName === 'results') {
                 updateResults();
             }
         }
-
+        
         // Select a faculty to view its contestants
         function selectFaculty(faculty) {
             currentFaculty = faculty;
+            
+            // Update faculty title
             const facultyTitles = {
                 sciences: "Faculty of Sciences",
                 engineering: "Faculty of Engineering",
@@ -462,10 +555,13 @@
                 humanities: "Faculty of Humanities",
                 resources: "Natural Resources"
             };
+            
             document.getElementById('faculty-title').textContent = facultyTitles[faculty] + " Contestants";
+            
             // Load Mr. contestants
             const mrContainer = document.getElementById('mr-contestants');
             mrContainer.innerHTML = '';
+            
             contestants[faculty].mr.forEach(contestant => {
                 const contestantEl = document.createElement('div');
                 contestantEl.className = 'contestant';
@@ -474,12 +570,14 @@
                     <p>${contestant.name}</p>
                     <small>${contestant.course}</small>
                 `;
-                contestantEl.onclick = () => selectContestant(contestant, 'mr', event);
+                contestantEl.onclick = () => selectContestant(contestant, 'mr');
                 mrContainer.appendChild(contestantEl);
             });
+            
             // Load Ms. contestants
             const msContainer = document.getElementById('ms-contestants');
             msContainer.innerHTML = '';
+            
             contestants[faculty].ms.forEach(contestant => {
                 const contestantEl = document.createElement('div');
                 contestantEl.className = 'contestant';
@@ -488,22 +586,31 @@
                     <p>${contestant.name}</p>
                     <small>${contestant.course}</small>
                 `;
-                contestantEl.onclick = () => selectContestant(contestant, 'ms', event);
+                contestantEl.onclick = () => selectContestant(contestant, 'ms');
                 msContainer.appendChild(contestantEl);
             });
+            
+            // Show contestants view
             document.getElementById('contestants-view').classList.remove('hidden');
+            
+            // Scroll to contestants view
             document.getElementById('contestants-view').scrollIntoView({ behavior: 'smooth' });
         }
-
+        
         // Select a contestant
-        function selectContestant(contestant, category, event) {
+        function selectContestant(contestant, category) {
+            // Clear previous selection for this category
             const containers = document.querySelectorAll('.contestant');
             containers.forEach(el => {
                 if (el.parentNode.id === `${category}-contestants`) {
                     el.classList.remove('selected');
                 }
             });
+            
+            // Mark the selected contestant
             event.currentTarget.classList.add('selected');
+            
+            // Store selection
             if (category === 'mr') {
                 selectedMr = contestant;
                 document.getElementById('selected-mr').textContent = `Selected Mr.: ${contestant.name}`;
@@ -511,75 +618,71 @@
                 selectedMs = contestant;
                 document.getElementById('selected-ms').textContent = `Selected Ms.: ${contestant.name}`;
             }
+            
+            // Enable vote button if both are selected
             if (selectedMr && selectedMs) {
                 document.getElementById('vote-button').disabled = false;
             }
         }
-
-        // Check if user has already voted (ask backend)
-        async function hasVoted() {
-            const voterId = getVoterId();
-            const res = await fetch(`${API_URL}/hasVoted?voterId=${voterId}`);
-            const data = await res.json();
-            return data.hasVoted;
-        }
-
-        // Cast a vote (send to backend)
-        async function castVote() {
-            const voterId = getVoterId();
-            // Check with backend if already voted
-            const alreadyVoted = await hasVoted();
-            if (alreadyVoted) {
+        
+        // Cast a vote
+        function castVote() {
+            // Check if user has already voted
+            if (hasVoted()) {
                 showVoteStatus('You have already voted. Each person can only vote once.', 'error');
                 return;
             }
-            // Submit vote
-            const res = await fetch(`${API_URL}/vote`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    mrId: selectedMr.id,
-                    msId: selectedMs.id,
-                    voterId: voterId
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                showVoteStatus(`Vote successfully cast for ${selectedMr.name} (Mr. Unitech) and ${selectedMs.name} (Ms. Unitech)!`, 'success');
-                selectedMr = null;
-                selectedMs = null;
-                document.getElementById('selected-mr').textContent = 'Selected Mr.: None';
-                document.getElementById('selected-ms').textContent = 'Selected Ms.: None';
-                document.getElementById('vote-button').disabled = true;
-                const selectedContestants = document.querySelectorAll('.contestant.selected');
-                selectedContestants.forEach(el => el.classList.remove('selected'));
-                updateResults();
-            } else {
-                showVoteStatus(data.message || 'Vote failed.', 'error');
-            }
+            
+            // Record the vote
+            selectedMr.votes++;
+            selectedMs.votes++;
+            
+            // Save votes to localStorage
+            saveVotes();
+            
+            // Track the voter
+            trackVoter();
+            
+            // Show success message
+            showVoteStatus(`Vote successfully cast for ${selectedMr.name} (Mr. Unitech) and ${selectedMs.name} (Ms. Unitech)!`, 'success');
+            
+            // Reset selections
+            selectedMr = null;
+            selectedMs = null;
+            document.getElementById('selected-mr').textContent = 'Selected Mr.: None';
+            document.getElementById('selected-ms').textContent = 'Selected Ms.: None';
+            document.getElementById('vote-button').disabled = true;
+            
+            // Clear visual selections
+            const selectedContestants = document.querySelectorAll('.contestant.selected');
+            selectedContestants.forEach(el => el.classList.remove('selected'));
+            
+            // Update results
+            updateResults();
         }
-
+        
         // Show vote status message
         function showVoteStatus(message, type) {
             const statusEl = document.getElementById('vote-status');
             statusEl.textContent = message;
             statusEl.className = 'vote-status';
+            
             if (type === 'success') {
                 statusEl.classList.add('vote-success');
             } else if (type === 'error') {
                 statusEl.classList.add('vote-error');
             }
+            
             statusEl.classList.remove('hidden');
+            
+            // Hide message after 5 seconds
             setTimeout(() => {
                 statusEl.classList.add('hidden');
             }, 5000);
         }
-
-        // Update results tables (fetch from backend)
-        async function updateResults() {
-            const res = await fetch(`${API_URL}/contestants`);
-            const data = await res.json();
-            contestants = data;
+        
+        // Update results tables
+        function updateResults() {
             // Aggregate Mr. contestants
             const allMr = [];
             for (const faculty in contestants) {
@@ -593,9 +696,14 @@
                     });
                 });
             }
+            
+            // Sort by votes
             allMr.sort((a, b) => b.votes - a.votes);
+            
+            // Update Mr. results table
             const mrTable = document.getElementById('mr-results');
             mrTable.innerHTML = '';
+            
             allMr.forEach((contestant, index) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -607,6 +715,7 @@
                 `;
                 mrTable.appendChild(row);
             });
+            
             // Aggregate Ms. contestants
             const allMs = [];
             for (const faculty in contestants) {
@@ -620,9 +729,14 @@
                     });
                 });
             }
+            
+            // Sort by votes
             allMs.sort((a, b) => b.votes - a.votes);
+            
+            // Update Ms. results table
             const msTable = document.getElementById('ms-results');
             msTable.innerHTML = '';
+            
             allMs.forEach((contestant, index) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -635,7 +749,7 @@
                 msTable.appendChild(row);
             });
         }
-
+        
         // Share voting link
         function shareLink() {
             if (navigator.share) {
@@ -650,7 +764,7 @@
                 alert('Web Share API not supported in your browser. You can copy the link instead.');
             }
         }
-
+        
         // Copy voting link
         function copyLink() {
             navigator.clipboard.writeText(window.location.href)
@@ -660,16 +774,19 @@
                     alert('Failed to copy link. Please try again.');
                 });
         }
-
+        
         // Initialize the application
-        async function init() {
-            await updateResults();
+        function init() {
+            initializeVotes();
+            updateResults();
+            
             // Check if user has already voted
-            if (await hasVoted()) {
+            if (hasVoted()) {
                 showVoteStatus('You have already voted. Thank you for participating!', 'success');
             }
         }
-
+        
+        // Run initialization when page loads
         window.onload = init;
     </script>
 </body>
